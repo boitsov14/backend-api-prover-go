@@ -24,7 +24,7 @@ const (
 type Request struct {
 	Formula string `json:"formula" validate:"required"`
 	Options string `json:"options" validate:"required"`
-	Timeout int    `json:"timeout" validate:"required"`
+	Timeout int    `json:"timeout" validate:"required,min=1"`
 }
 
 func main() {
@@ -71,10 +71,12 @@ func main() {
 
 		// write formula content to formula.txt file
 		if err := os.WriteFile(filepath.Join(out, "formula.txt"), []byte(req.Formula), PERM); err != nil {
+			log.Error(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 		// write options content to options.json file
 		if err := os.WriteFile(filepath.Join(out, "options.json"), []byte(req.Options), PERM); err != nil {
+			log.Error(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
