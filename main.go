@@ -1,6 +1,9 @@
 package main
 
-import "github.com/gofiber/fiber/v2"
+import (
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/log"
+)
 
 func main() {
 	app := fiber.New()
@@ -9,5 +12,5 @@ func main() {
 		return c.SendString("Hello, World!")
 	})
 
-	app.Listen(":3000")
+	log.Fatal(app.Listen(":3000"))
 }

@@ -24,3 +24,11 @@ update:
 # Add dependency to go.mod
 add package:
     go get {{ package }}
+
+# Fmt
+fmt:
+    golangci-lint fmt
+
+# Lint
+lint:
+    golangci-lint run --fix
