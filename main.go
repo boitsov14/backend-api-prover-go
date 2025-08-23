@@ -40,8 +40,10 @@ type Response struct {
 }
 
 func main() {
-	// create fiber instance
-	app := fiber.New()
+	// create fiber instance with disabled startup message
+	app := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+	})
 
 	// create validator instance
 	validate := validator.New()
