@@ -29,9 +29,16 @@ linters:
     nolintlint: # stricter
       require-explanation: true
       require-specific: true
+    perfsprint: # stricter
+      strconcat: false
     staticcheck: # stricter
       checks:
         - all
+    revive:
+      enable-all-rules: true
+      rules:
+        - name: package-comments
+          disabled: true
   exclusions:
     rules:
       - path: '_test\.go'
