@@ -10,7 +10,7 @@ just-fmt:
 
 # Update Go
 update-go:
-    winget upgrade --id GoLang.Go
+    winget upgrade --id GoLang.Go  || true
 
 # Update dependencies
 update:
