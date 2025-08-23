@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/gofiber/fiber/v2/middleware/basicauth"
@@ -13,8 +14,17 @@ import (
 	"os"
 )
 
+// Request body.
+type Request struct {
+	Formula string `json:"formula" validate:"required"`
+	Options string `json:"options" validate:"required"`
+	Timeout int    `json:"timeout" validate:"required"`
+}
+
 func main() {
 	app := fiber.New()
+
+	validate := validator.New()
 
 	app.Use(recover.New())
 	app.Use(helmet.New())
@@ -28,7 +38,17 @@ func main() {
 		},
 	}))
 
-	app.Get("/", func(c *fiber.Ctx) error {
+	app.Post("/", func(c *fiber.Ctx) error {
+		// parse JSON request body into struct
+		req := new(Request)
+		if err := c.BodyParser(req); err != nil {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+		// validate required fields using struct tags
+		if err := validate.Struct(req); err != nil {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
 		return c.SendString("Hello, World!")
 	})
 
