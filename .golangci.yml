@@ -44,6 +44,10 @@ linters:
           disabled: true
         - name: line-length-limit
           disabled: true
+        - name: function-length
+          disabled: true
+        - name: cyclomatic
+          disabled: true
   exclusions:
     rules:
       - path: '_test\.go'

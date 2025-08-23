@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -26,6 +29,13 @@ type Request struct {
 	Options string   `json:"options" validate:"required"`
 	Files   []string `json:"files"   validate:"required,min=1"`
 	Timeout int      `json:"timeout" validate:"required,min=1"`
+}
+
+// Response body.
+type Response struct {
+	Output  string            `json:"output"`
+	Timeout bool              `json:"timeout,omitempty"`
+	Files   map[string]string `json:"files"`
 }
 
 func main() {
@@ -52,13 +62,13 @@ func main() {
 		req := new(Request)
 		// parse JSON request body into struct
 		if err := c.BodyParser(req); err != nil {
-			log.Warn(err)
+			log.Error(err)
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
 		log.Info(req)
 		// validate required fields using struct tags
 		if err := validate.Struct(req); err != nil {
-			log.Warn(err)
+			log.Error(err)
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
 
@@ -81,7 +91,39 @@ func main() {
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
-		return c.SendString("Hello, World!")
+		// create context with timeout
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.Timeout)*time.Second)
+		defer cancel()
+
+		// set up command
+		cmd := exec.CommandContext(ctx, "./prover", "--out", out)
+
+		// execute prover and get combined output
+		output, err := cmd.CombinedOutput()
+		if err != nil && ctx.Err() != context.DeadlineExceeded {
+			log.Error(err)
+		}
+
+		// initialize response
+		response := Response{
+			Output:  string(output),
+			Timeout: ctx.Err() == context.DeadlineExceeded,
+			Files:   make(map[string]string),
+		}
+
+		// read output files
+		for _, filename := range req.Files {
+			// read file content
+			content, err := os.ReadFile(filepath.Join(out, filename))
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			response.Files[filename] = string(content)
+		}
+
+		// return JSON response
+		return c.JSON(response)
 	})
 
 	// set port
