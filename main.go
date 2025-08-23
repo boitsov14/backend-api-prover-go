@@ -26,17 +26,16 @@ const (
 
 // Request body.
 type Request struct {
-	Formula string   `json:"formula" validate:"required"`
-	Options string   `json:"options" validate:"required"`
-	Files   []string `json:"files"   validate:"required,min=1"`
-	Timeout int      `json:"timeout" validate:"required,min=1"`
+	Formula string `json:"formula" validate:"required"`
+	Options string `json:"options" validate:"required"`
+	Timeout int    `json:"timeout" validate:"required,min=1"`
 }
 
 // Response body.
 type Response struct {
 	Files   map[string]string `json:"files"`
 	Output  string            `json:"output"`
-	Timeout bool              `json:"timeout,omitempty"`
+	Timeout bool              `json:"timeout"`
 }
 
 func main() {
@@ -52,7 +51,7 @@ func main() {
 	app.Use(compress.New())
 	app.Use(healthcheck.New())
 
-	// for basic authentication
+	// set up basic authentication
 	app.Use(basicauth.New(basicauth.Config{
 		Users: map[string]string{
 			"user": os.Getenv("PASSWORD"),
@@ -96,10 +95,8 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.Timeout)*time.Second)
 		defer cancel()
 
-		// set up command
-		cmd := exec.CommandContext(ctx, "./prover", "--out", out)
-
 		// execute prover and get combined output
+		cmd := exec.CommandContext(ctx, "./prover", "--out", out) // #nosec G204
 		output, err := cmd.CombinedOutput()
 		if err != nil && !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			log.Error(err)
@@ -112,15 +109,27 @@ func main() {
 			Files:   make(map[string]string),
 		}
 
-		// read output files
-		for _, filename := range req.Files {
+		// read all files in output directory
+		files, err := os.ReadDir(out)
+		if err != nil {
+			log.Error(err)
+			// return response without files
+			return c.JSON(response)
+		}
+
+		// process each file in output directory
+		for _, file := range files {
+			filename := file.Name()
 			// read file content
-			content, err := os.ReadFile(filepath.Join(out, filename))
+			content, err := os.ReadFile(filepath.Join(out, filename)) // #nosec G304
 			if err != nil {
 				log.Error(err)
+				// skip this file and continue
 				continue
 			}
+			// add file content to response
 			response.Files[filename] = string(content)
+			log.Info("Added file:", filename)
 		}
 
 		// return JSON response
