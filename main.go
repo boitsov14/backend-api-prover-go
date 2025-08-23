@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
@@ -11,7 +13,10 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	_ "github.com/joho/godotenv/autoload"
-	"os"
+)
+
+const (
+	PERM = 0600
 )
 
 // Request body.
@@ -22,8 +27,10 @@ type Request struct {
 }
 
 func main() {
+	// create fiber instance
 	app := fiber.New()
 
+	// create validator instance
 	validate := validator.New()
 
 	app.Use(recover.New())
@@ -32,6 +39,7 @@ func main() {
 	app.Use(compress.New())
 	app.Use(healthcheck.New())
 
+	// for basic authentication
 	app.Use(basicauth.New(basicauth.Config{
 		Users: map[string]string{
 			"user": os.Getenv("PASSWORD"),
@@ -47,6 +55,14 @@ func main() {
 		// validate required fields using struct tags
 		if err := validate.Struct(req); err != nil {
 			return c.SendStatus(fiber.StatusBadRequest)
+		}
+		// write formula content to formula.txt file
+		if err := os.WriteFile("formula.txt", []byte(req.Formula), PERM); err != nil {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+		// write options content to options.json file
+		if err := os.WriteFile("options.json", []byte(req.Options), PERM); err != nil {
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
 		return c.SendString("Hello, World!")

@@ -40,6 +40,10 @@ linters:
       rules:
         - name: package-comments
           disabled: true
+        - name: cognitive-complexity
+          disabled: true
+        - name: line-length-limit
+          disabled: true
   exclusions:
     rules:
       - path: '_test\.go'
