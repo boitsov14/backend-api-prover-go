@@ -45,10 +45,15 @@ func main() {
 	// create validator instance
 	validate := validator.New()
 
+	// recover from panics
 	app.Use(recover.New())
+	// for security
 	app.Use(helmet.New())
+	// for logging
 	app.Use(logger.New())
+	// for compression
 	app.Use(compress.New())
+	// for healthcheck at /livez
 	app.Use(healthcheck.New())
 
 	// set up basic authentication
