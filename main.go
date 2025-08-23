@@ -22,9 +22,10 @@ const (
 
 // Request body.
 type Request struct {
-	Formula string `json:"formula" validate:"required"`
-	Options string `json:"options" validate:"required"`
-	Timeout int    `json:"timeout" validate:"required,min=1"`
+	Formula string   `json:"formula" validate:"required"`
+	Options string   `json:"options" validate:"required"`
+	Files   []string `json:"files"   validate:"required,min=1"`
+	Timeout int      `json:"timeout" validate:"required,min=1"`
 }
 
 func main() {
