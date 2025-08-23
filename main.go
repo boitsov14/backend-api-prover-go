@@ -34,9 +34,9 @@ type Request struct {
 
 // Response body.
 type Response struct {
+	Files   map[string]string `json:"files"`
 	Output  string            `json:"output"`
 	Timeout bool              `json:"timeout,omitempty"`
-	Files   map[string]string `json:"files"`
 }
 
 func main() {
