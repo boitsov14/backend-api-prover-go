@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -100,14 +101,14 @@ func main() {
 
 		// execute prover and get combined output
 		output, err := cmd.CombinedOutput()
-		if err != nil && ctx.Err() != context.DeadlineExceeded {
+		if err != nil && !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			log.Error(err)
 		}
 
 		// initialize response
 		response := Response{
 			Output:  string(output),
-			Timeout: ctx.Err() == context.DeadlineExceeded,
+			Timeout: errors.Is(ctx.Err(), context.DeadlineExceeded),
 			Files:   make(map[string]string),
 		}
 
