@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -47,21 +48,33 @@ func main() {
 	}))
 
 	app.Post("/", func(c *fiber.Ctx) error {
-		// parse JSON request body into struct
 		req := new(Request)
+		// parse JSON request body into struct
 		if err := c.BodyParser(req); err != nil {
+			log.Warn(err)
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
+		log.Info(req)
 		// validate required fields using struct tags
 		if err := validate.Struct(req); err != nil {
+			log.Warn(err)
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
+
+		// create temporary directory
+		out, err := os.MkdirTemp(".", "out-")
+		if err != nil {
+			log.Error(err)
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+		defer os.RemoveAll(out)
+
 		// write formula content to formula.txt file
-		if err := os.WriteFile("formula.txt", []byte(req.Formula), PERM); err != nil {
+		if err := os.WriteFile(filepath.Join(out, "formula.txt"), []byte(req.Formula), PERM); err != nil {
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 		// write options content to options.json file
-		if err := os.WriteFile("options.json", []byte(req.Options), PERM); err != nil {
+		if err := os.WriteFile(filepath.Join(out, "options.json"), []byte(req.Options), PERM); err != nil {
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 

@@ -3,7 +3,6 @@ version: "2"
 issues:
   max-same-issues: 0 # show all issues
   max-issues-per-linter: 0 # show all issues
-  fix: true
 
 formatters:
   default: all
@@ -22,6 +21,7 @@ linters:
     - varnamelen # don't care about variable name length
     # - wrapcheck # don't want to wrap every error from external package
     - wsl # don't want to restrict when to insert a new line
+    - wsl_v5 # don't want to restrict when to insert a new line
   settings:
     govet:
       enable-all: true
