@@ -21,6 +21,7 @@ import (
 )
 
 const (
+	// file permission for created files.
 	PERM = 0600
 )
 
@@ -56,26 +57,33 @@ func main() {
 	// for healthcheck at /livez
 	app.Use(healthcheck.New())
 
-	// set up basic authentication
+	// setup basic authentication
 	app.Use(basicauth.New(basicauth.Config{
 		Users: map[string]string{
 			"user": os.Getenv("PASSWORD"),
 		},
 	}))
 
+	// main API
 	app.Post("/", func(c *fiber.Ctx) error {
+		log.Info("Received request")
+
+		// initialize request
 		req := new(Request)
+
 		// parse JSON request body into struct
 		if err := c.BodyParser(req); err != nil {
 			log.Error(err)
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
 		log.Info(req)
+
 		// validate required fields using struct tags
 		if err := validate.Struct(req); err != nil {
 			log.Error(err)
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
+		log.Info("Validation passed")
 
 		// create temporary directory
 		out, err := os.MkdirTemp(".", "out-")
@@ -83,18 +91,29 @@ func main() {
 			log.Error(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
-		defer os.RemoveAll(out)
+		// cleanup of temporary directory
+		defer func() {
+			if err := os.RemoveAll(out); err != nil {
+				log.Error(err)
+			} else {
+				log.Info("Cleaned up temporary directory:", out)
+			}
+		}()
+		log.Info("Created temporary directory:", out)
 
 		// write formula content to formula.txt file
 		if err := os.WriteFile(filepath.Join(out, "formula.txt"), []byte(req.Formula), PERM); err != nil {
 			log.Error(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
+		log.Info("Wrote formula to file")
+
 		// write options content to options.json file
 		if err := os.WriteFile(filepath.Join(out, "options.json"), []byte(req.Options), PERM); err != nil {
 			log.Error(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
+		log.Info("Wrote options to file")
 
 		// create context with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.Timeout)*time.Second)
@@ -103,28 +122,37 @@ func main() {
 		// execute prover and get combined output
 		cmd := exec.CommandContext(ctx, "./prover", "--out", out) // #nosec G204
 		output, err := cmd.CombinedOutput()
-		if err != nil && !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		// check if execution timed out
+		timeout := errors.Is(ctx.Err(), context.DeadlineExceeded)
+		switch {
+		case timeout:
+			log.Warn("Timeout")
+		case err != nil:
 			log.Error(err)
+		default:
+			log.Info("Completed successfully")
 		}
 
 		// initialize response
 		response := Response{
 			Output:  string(output),
-			Timeout: errors.Is(ctx.Err(), context.DeadlineExceeded),
+			Timeout: timeout,
 			Files:   make(map[string]string),
 		}
 
-		// read all files in output directory
+		// read all files from output directory
 		files, err := os.ReadDir(out)
 		if err != nil {
 			log.Error(err)
 			// return response without files
 			return c.JSON(response)
 		}
+		log.Info("Found", len(files), "files in output directory")
 
 		// process each file in output directory
 		for _, file := range files {
 			filename := file.Name()
+
 			// read file content
 			content, err := os.ReadFile(filepath.Join(out, filename)) // #nosec G304
 			if err != nil {
@@ -132,6 +160,7 @@ func main() {
 				// skip this file and continue
 				continue
 			}
+
 			// add file content to response
 			response.Files[filename] = string(content)
 			log.Info("Added file:", filename)
@@ -141,11 +170,13 @@ func main() {
 		return c.JSON(response)
 	})
 
-	// set port
+	// initialize port
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
 
+	// start server
+	log.Info("Starting server on port:", port)
 	log.Fatal(app.Listen(":" + port))
 }
