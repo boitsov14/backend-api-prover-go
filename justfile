@@ -9,12 +9,16 @@ just-fmt:
     just --fmt --unstable
 
 # Update Go
+# To check version, run `go version`
+# To update go.mod, run `go mod edit -go=1.xx.x`
+# To update golangci-lint, visit https://golangci-lint.run/docs/welcome/install/#binaries
+# To update tools, Ctrl+Shift+P and search for "Go: Install/Update Tools"
 update-go:
-    winget upgrade --id GoLang.Go  || true
+    winget upgrade GoLang.Go || true
 
 # Update dependencies
 update:
-    go get -u ./...
+    go get -t -u ./...
     go mod tidy
 
 # Add dependency to go.mod
