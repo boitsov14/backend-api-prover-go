@@ -169,7 +169,7 @@ func main() {
 			log.Info("Added file:", filename)
 		}
 
-		// return JSON
+		// return response
 		return c.JSON(response)
 	})
 
