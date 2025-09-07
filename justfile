@@ -39,4 +39,3 @@ add package:
 # Copy binary from Rust project
 copy-prover:
     cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./prover"
-    ls -l prover
