@@ -18,6 +18,7 @@ linters:
     - nlreturn # don't want to insert a newline before return statement
     - noinlineerr # want to use inline error
     - varnamelen # don't care about variable name length
+    - wrapcheck # don't want to wrap every error
     - wsl # don't want to restrict when to insert a new line
     - wsl_v5 # don't want to restrict when to insert a new line
   settings:

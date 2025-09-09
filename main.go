@@ -81,9 +81,6 @@ func main() {
 func prove(c *fiber.Ctx) error {
 	log.Info("Received request")
 
-	// validator instance
-	validate := validator.New()
-
 	// initialize request
 	req := new(Request)
 
@@ -95,6 +92,7 @@ func prove(c *fiber.Ctx) error {
 	log.Info(req)
 
 	// validate
+	validate := validator.New()
 	if err := validate.Struct(req); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusBadRequest)
