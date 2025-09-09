@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -27,9 +28,9 @@ const (
 
 // Request body.
 type Request struct {
-	Formula string `json:"formula" validate:"required"`
-	Options string `json:"options" validate:"required"`
-	Timeout int    `json:"timeout" validate:"required,min=1"`
+	Options map[string]any `json:"options" validate:"required"`
+	Formula string         `json:"formula" validate:"required"`
+	Timeout int            `json:"timeout" validate:"required,min=1"`
 }
 
 // Response body.
@@ -122,8 +123,15 @@ func prove(c *fiber.Ctx) error {
 	}
 	log.Info("Wrote formula to file")
 
+	// convert options to JSON string
+	options, err := json.MarshalIndent(req.Options, "", "  ")
+	if err != nil {
+		log.Error(err)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+
 	// write options to file
-	if err := os.WriteFile(filepath.Join(out, "options.json"), []byte(req.Options), PERM); err != nil {
+	if err := os.WriteFile(filepath.Join(out, "options.json"), options, PERM); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
