@@ -12,12 +12,15 @@ just-fmt:
     just --fmt --unstable
 
 # Update Go
-# To update go.mod, run `go mod edit -go=1.xx.x`
 # To update golangci-lint, visit https://golangci-lint.run/docs/welcome/install/#binaries
 # To update tools, Ctrl+Shift+P and search for "Go: Install/Update Tools"
 update-go:
     go version
     winget upgrade GoLang.Go || true
+
+# Update Go version in go.mod
+update-mod:
+    go mod edit -go=1.25.1
 
 # Update dependencies
 update:
@@ -43,3 +46,7 @@ add package:
 # Copy binary from Rust project
 copy-prover:
     cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./prover"
+
+# Build Docker image
+docker:
+    docker build -t prover .
