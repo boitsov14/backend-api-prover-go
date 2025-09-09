@@ -32,6 +32,10 @@ fmt:
 lint:
     golangci-lint run --fix
 
+# Build binary for Linux
+build:
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -trimpath -o main
+
 # Add dependency to go.mod
 add package:
     go get {{ package }}
