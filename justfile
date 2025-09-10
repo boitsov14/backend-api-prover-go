@@ -35,13 +35,17 @@ fmt:
 lint:
     golangci-lint run --fix
 
-# Build binary for Linux
-build:
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -trimpath -o main
-
 # Add dependency to go.mod
 add package:
     go get {{ package }}
+
+###############################################
+# Build and Deploy
+###############################################
+
+# Build binary for Linux
+build:
+    GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o main
 
 # Copy binary from Rust project
 copy-prover:
@@ -50,3 +54,9 @@ copy-prover:
 # Build Docker image
 docker:
     docker build -t prover .
+
+# Run Docker container
+container:
+    docker stop prover || true
+    docker rm prover || true
+    docker run --env-file .env -p 3000:3000 --name prover prover

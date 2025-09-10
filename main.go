@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -19,6 +20,9 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/knadh/koanf"
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/file"
 )
 
 const (
@@ -36,7 +40,8 @@ type Request struct {
 // Response body.
 type Response struct {
 	Files   map[string]string `json:"files"`
-	Output  string            `json:"output"`
+	Result  map[string]any    `json:"result"`
+	Stdout  string            `json:"stdout"`
 	Timeout bool              `json:"timeout"`
 }
 
@@ -47,16 +52,12 @@ func main() {
 		DisableStartupMessage: true,
 	})
 
-	// recover from panics
-	app.Use(recover.New())
-	// security
-	app.Use(helmet.New())
-	// logging
-	app.Use(logger.New())
-	// compression
-	app.Use(compress.New())
-	// healthcheck at /livez
-	app.Use(healthcheck.New())
+	// add middlewares
+	app.Use(recover.New())     // recover from panics
+	app.Use(helmet.New())      // security
+	app.Use(logger.New())      // logging
+	app.Use(compress.New())    // compression
+	app.Use(healthcheck.New()) // healthcheck at /livez
 
 	// basic authentication
 	app.Use(basicauth.New(basicauth.Config{
@@ -121,7 +122,6 @@ func prove(c *fiber.Ctx) error {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	log.Info("Wrote formula to file")
 
 	// convert options to JSON string
 	options, err := json.MarshalIndent(req.Options, "", "  ")
@@ -129,21 +129,25 @@ func prove(c *fiber.Ctx) error {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-
 	// write options to file
 	if err := os.WriteFile(filepath.Join(out, "options.json"), options, PERM); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	log.Info("Wrote options to file")
+	log.Info("Wrote input files")
 
 	// context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.Timeout)*time.Second)
 	defer cancel()
 
 	// execute prover
-	cmd := exec.CommandContext(ctx, "./prover", "--out", out) // #nosec G204
-	output, err := cmd.CombinedOutput()
+	log.Info("Starting prover..")
+	prover := "./prover"
+	if runtime.GOOS == "windows" {
+		prover = "./prover.exe"
+	}
+	cmd := exec.CommandContext(ctx, prover, "--out", out) // #nosec G204
+	stdout, err := cmd.CombinedOutput()
 	// check if timed out
 	timeout := errors.Is(ctx.Err(), context.DeadlineExceeded)
 	switch {
@@ -155,12 +159,36 @@ func prove(c *fiber.Ctx) error {
 		log.Info("Completed successfully")
 	}
 
+	// remove input files
+	if err := os.Remove(filepath.Join(out, "formula.txt")); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	if err := os.Remove(filepath.Join(out, "options.json")); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	log.Info("Removed input files")
+
 	// initialize response
 	response := Response{
-		Output:  string(output),
+		Stdout:  string(stdout),
 		Timeout: timeout,
 		Files:   make(map[string]string),
 	}
+
+	// parse result.log
+	k := koanf.New(".")
+	if err := k.Load(file.Provider(filepath.Join(out, "result.log")), yaml.Parser()); err != nil {
+		log.Error(err)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	response.Result = k.All()
+	log.Info("Parsed result.log")
+
+	// remove result.log
+	if err := os.Remove(filepath.Join(out, "result.log")); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	log.Info("Removed result.log")
 
 	// read all files from output directory
 	files, err := os.ReadDir(out)
@@ -169,11 +197,12 @@ func prove(c *fiber.Ctx) error {
 		// return response without files
 		return c.JSON(response)
 	}
-	log.Info("Found", len(files), "files in output directory")
+	log.Info("Found ", len(files), " files in output directory")
 
 	// process each file in output directory
-	for _, file := range files {
-		filename := file.Name()
+	for _, f := range files {
+		// get filename
+		filename := f.Name()
 
 		// read file
 		content, err := os.ReadFile(filepath.Join(out, filename)) // #nosec G304
