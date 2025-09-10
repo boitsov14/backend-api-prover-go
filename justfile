@@ -60,3 +60,13 @@ container:
     docker stop prover || true
     docker rm prover || true
     docker run --env-file .env -p 3000:3000 --name prover prover
+
+# Run all steps
+all:
+    just fmt
+    just lint
+    just update
+    just build
+    just copy-prover
+    just docker
+    just container
