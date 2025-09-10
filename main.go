@@ -39,10 +39,8 @@ type Request struct {
 
 // Response body.
 type Response struct {
-	Files   map[string]string `json:"files"`
-	Result  map[string]any    `json:"result"`
-	Stdout  string            `json:"stdout"`
-	Timeout bool              `json:"timeout"`
+	Files  map[string]string `json:"files"`
+	Result map[string]any    `json:"result"`
 }
 
 func main() {
@@ -170,9 +168,7 @@ func prove(c *fiber.Ctx) error {
 
 	// initialize response
 	response := Response{
-		Stdout:  string(stdout),
-		Timeout: timeout,
-		Files:   make(map[string]string),
+		Files: make(map[string]string),
 	}
 
 	// parse result.log
@@ -183,6 +179,10 @@ func prove(c *fiber.Ctx) error {
 	}
 	response.Result = k.All()
 	log.Info("Parsed result.log")
+
+	// add stdout and timeout to result
+	response.Result["stdout"] = string(stdout)
+	response.Result["timeout"] = timeout
 
 	// remove result.log
 	if err := os.Remove(filepath.Join(out, "result.log")); err != nil {
