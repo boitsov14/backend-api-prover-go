@@ -79,7 +79,7 @@ func main() {
 }
 
 func prove(c *fiber.Ctx) error {
-	log.Info("Received request")
+	log.Info("Request received")
 
 	// initialize request
 	req := new(Request)
@@ -89,6 +89,7 @@ func prove(c *fiber.Ctx) error {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
+	// TODO: 2025/09/10 google cloud run上でどう見えるか確認する
 	log.Info(req)
 
 	// validate
@@ -100,23 +101,23 @@ func prove(c *fiber.Ctx) error {
 	log.Info("Validation passed")
 
 	// temporary directory
-	out, err := os.MkdirTemp(".", "out-")
+	temp, err := os.MkdirTemp(".", "temp-")
 	if err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	// cleanup
 	defer func() {
-		if err := os.RemoveAll(out); err != nil {
+		if err := os.RemoveAll(temp); err != nil {
 			log.Error(err)
 		} else {
-			log.Info("Cleaned up temporary directory:", out)
+			log.Info("Cleaned up temp directory: ", temp)
 		}
 	}()
-	log.Info("Created temporary directory:", out)
+	log.Info("Created temp directory: ", temp)
 
 	// write formula to file
-	if err := os.WriteFile(filepath.Join(out, "formula.txt"), []byte(req.Formula), PERM); err != nil {
+	if err := os.WriteFile(filepath.Join(temp, "formula.txt"), []byte(req.Formula), PERM); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -128,7 +129,7 @@ func prove(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	// write options to file
-	if err := os.WriteFile(filepath.Join(out, "options.json"), options, PERM); err != nil {
+	if err := os.WriteFile(filepath.Join(temp, "options.json"), options, PERM); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -139,12 +140,12 @@ func prove(c *fiber.Ctx) error {
 	defer cancel()
 
 	// execute prover
-	log.Info("Starting prover..")
 	prover := "./prover"
 	if runtime.GOOS == "windows" {
 		prover = "./prover.exe"
 	}
-	cmd := exec.CommandContext(ctx, prover, "--out", out) // #nosec G204
+	log.Info("Proving..")
+	cmd := exec.CommandContext(ctx, prover, "--out", temp) // #nosec G204
 	stdout, err := cmd.CombinedOutput()
 	// check if timed out
 	timeout := errors.Is(ctx.Err(), context.DeadlineExceeded)
@@ -154,14 +155,14 @@ func prove(c *fiber.Ctx) error {
 	case err != nil:
 		log.Error(err)
 	default:
-		log.Info("Completed successfully")
+		log.Info("Done")
 	}
 
 	// remove input files
-	if err := os.Remove(filepath.Join(out, "formula.txt")); err != nil {
+	if err := os.Remove(filepath.Join(temp, "formula.txt")); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	if err := os.Remove(filepath.Join(out, "options.json")); err != nil {
+	if err := os.Remove(filepath.Join(temp, "options.json")); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	log.Info("Removed input files")
@@ -173,7 +174,7 @@ func prove(c *fiber.Ctx) error {
 
 	// parse result.log
 	k := koanf.New(".")
-	if err := k.Load(file.Provider(filepath.Join(out, "result.log")), yaml.Parser()); err != nil {
+	if err := k.Load(file.Provider(filepath.Join(temp, "result.log")), yaml.Parser()); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -185,27 +186,27 @@ func prove(c *fiber.Ctx) error {
 	response.Result["timeout"] = timeout
 
 	// remove result.log
-	if err := os.Remove(filepath.Join(out, "result.log")); err != nil {
+	if err := os.Remove(filepath.Join(temp, "result.log")); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	log.Info("Removed result.log")
 
 	// read all files from output directory
-	files, err := os.ReadDir(out)
+	files, err := os.ReadDir(temp)
 	if err != nil {
 		log.Error(err)
 		// return response without files
 		return c.JSON(response)
 	}
-	log.Info("Found ", len(files), " files in output directory")
+	log.Info("Found ", len(files), " files in temp directory")
 
-	// process each file in output directory
+	// process each file in temp directory
 	for _, f := range files {
 		// get filename
 		filename := f.Name()
 
 		// read file
-		content, err := os.ReadFile(filepath.Join(out, filename)) // #nosec G304
+		content, err := os.ReadFile(filepath.Join(temp, filename)) // #nosec G304
 		if err != nil {
 			log.Error(err)
 			// skip and continue
@@ -214,8 +215,8 @@ func prove(c *fiber.Ctx) error {
 
 		// add content to response
 		response.Files[filename] = string(content)
-		log.Info("Added file:", filename)
 	}
+	log.Info("Added all files")
 
 	// return response
 	return c.JSON(response)

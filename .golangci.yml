@@ -14,6 +14,7 @@ linters:
     - depguard # don't want to restrict imports
     - exhaustruct # redundant to write all struct fields
     - funlen # don't care about function length
+    - godox # want to use TODO comments
     - nestif # don't care about the complexity of nested if statements
     - nlreturn # don't want to insert a newline before return statement
     - noinlineerr # want to use inline error
