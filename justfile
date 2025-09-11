@@ -24,6 +24,7 @@ update-mod:
 
 # Update dependencies
 update:
+    go mod tidy
     go get -t -u ./...
     go mod tidy
 

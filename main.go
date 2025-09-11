@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/goccy/go-yaml"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/gofiber/fiber/v2/middleware/basicauth"
@@ -20,9 +21,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	_ "github.com/joho/godotenv/autoload"
-	"github.com/knadh/koanf"
-	"github.com/knadh/koanf/parsers/yaml"
-	"github.com/knadh/koanf/providers/file"
 )
 
 const (
@@ -168,28 +166,30 @@ func prove(c *fiber.Ctx) error {
 	log.Info("Removed input files")
 
 	// initialize response
-	response := Response{
-		Files: make(map[string]string),
-	}
+	response := new(Response)
 
-	// parse result.log
-	k := koanf.New(".")
-	if err := k.Load(file.Provider(filepath.Join(tmp, "result.log")), yaml.Parser()); err != nil {
+	// read result.yaml
+	content, err := os.ReadFile(filepath.Join(tmp, "result.yaml")) // #nosec G304
+	if err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	response.Result = k.All()
-	log.Info("Parsed result.log")
+	// parse YAML content
+	if err := yaml.Unmarshal(content, &response.Result); err != nil {
+		log.Error(err)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	log.Info("Read result.yaml")
 
 	// add stdout and timeout to result
 	response.Result["stdout"] = string(stdout)
 	response.Result["timeout"] = timeout
 
-	// remove result.log
-	if err := os.Remove(filepath.Join(tmp, "result.log")); err != nil {
+	// remove result.yaml
+	if err := os.Remove(filepath.Join(tmp, "result.yaml")); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	log.Info("Removed result.log")
+	log.Info("Removed result.yaml")
 
 	// read all files from output directory
 	files, err := os.ReadDir(tmp)
