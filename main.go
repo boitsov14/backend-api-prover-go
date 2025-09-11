@@ -166,7 +166,9 @@ func prove(c *fiber.Ctx) error {
 	log.Info("Removed input files")
 
 	// initialize response
-	response := new(Response)
+	response := Response{
+		Files: make(map[string]string),
+	}
 
 	// read result.yaml
 	content, err := os.ReadFile(filepath.Join(tmp, "result.yaml")) // #nosec G304
