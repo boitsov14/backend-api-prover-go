@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	// file permission.
-	PERM = 0600
+	// file permission: owner read only.
+	PERM = 0400
 )
 
 // Request body.

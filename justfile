@@ -62,6 +62,11 @@ container:
     docker rm prover || true
     docker run --env-file .env -p 3000:3000 --name prover prover
 
+# Stop and remove Docker container
+stop:
+    docker stop prover || true
+    docker rm prover || true
+
 # Run all steps
 all:
     just fmt
