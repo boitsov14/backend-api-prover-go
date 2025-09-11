@@ -101,23 +101,23 @@ func prove(c *fiber.Ctx) error {
 	log.Info("Validation passed")
 
 	// temporary directory
-	temp, err := os.MkdirTemp(".", "temp-")
+	tmp, err := os.MkdirTemp(".", "tmp-")
 	if err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	// cleanup
 	defer func() {
-		if err := os.RemoveAll(temp); err != nil {
+		if err := os.RemoveAll(tmp); err != nil {
 			log.Error(err)
 		} else {
-			log.Info("Cleaned up temp directory: ", temp)
+			log.Info("Cleaned up tmp directory: ", tmp)
 		}
 	}()
-	log.Info("Created temp directory: ", temp)
+	log.Info("Created tmp directory: ", tmp)
 
 	// write formula to file
-	if err := os.WriteFile(filepath.Join(temp, "formula.txt"), []byte(req.Formula), PERM); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "formula.txt"), []byte(req.Formula), PERM); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -129,7 +129,7 @@ func prove(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	// write options to file
-	if err := os.WriteFile(filepath.Join(temp, "options.json"), options, PERM); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "options.json"), options, PERM); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -145,7 +145,7 @@ func prove(c *fiber.Ctx) error {
 		prover = "./prover.exe"
 	}
 	log.Info("Proving..")
-	cmd := exec.CommandContext(ctx, prover, "--out", temp) // #nosec G204
+	cmd := exec.CommandContext(ctx, prover, "--out", tmp) // #nosec G204
 	stdout, err := cmd.CombinedOutput()
 	// check if timed out
 	timeout := errors.Is(ctx.Err(), context.DeadlineExceeded)
@@ -159,10 +159,10 @@ func prove(c *fiber.Ctx) error {
 	}
 
 	// remove input files
-	if err := os.Remove(filepath.Join(temp, "formula.txt")); err != nil {
+	if err := os.Remove(filepath.Join(tmp, "formula.txt")); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	if err := os.Remove(filepath.Join(temp, "options.json")); err != nil {
+	if err := os.Remove(filepath.Join(tmp, "options.json")); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	log.Info("Removed input files")
@@ -174,7 +174,7 @@ func prove(c *fiber.Ctx) error {
 
 	// parse result.log
 	k := koanf.New(".")
-	if err := k.Load(file.Provider(filepath.Join(temp, "result.log")), yaml.Parser()); err != nil {
+	if err := k.Load(file.Provider(filepath.Join(tmp, "result.log")), yaml.Parser()); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -186,27 +186,27 @@ func prove(c *fiber.Ctx) error {
 	response.Result["timeout"] = timeout
 
 	// remove result.log
-	if err := os.Remove(filepath.Join(temp, "result.log")); err != nil {
+	if err := os.Remove(filepath.Join(tmp, "result.log")); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	log.Info("Removed result.log")
 
 	// read all files from output directory
-	files, err := os.ReadDir(temp)
+	files, err := os.ReadDir(tmp)
 	if err != nil {
 		log.Error(err)
 		// return response without files
 		return c.JSON(response)
 	}
-	log.Info("Found ", len(files), " files in temp directory")
+	log.Info("Found ", len(files), " files in tmp directory")
 
-	// process each file in temp directory
+	// process each file in tmp directory
 	for _, f := range files {
 		// get filename
 		filename := f.Name()
 
 		// read file
-		content, err := os.ReadFile(filepath.Join(temp, filename)) // #nosec G304
+		content, err := os.ReadFile(filepath.Join(tmp, filename)) // #nosec G304
 		if err != nil {
 			log.Error(err)
 			// skip and continue
