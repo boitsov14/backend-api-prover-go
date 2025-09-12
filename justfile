@@ -50,6 +50,7 @@ build:
 
 # Copy binary from Rust project
 copy-prover:
+    -cp "$RUST_PROJECT_PATH/target/release/theorem-prover-rs.exe" "./prover.exe"
     cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./prover"
 
 # Build Docker image

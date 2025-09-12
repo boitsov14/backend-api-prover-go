@@ -23,11 +23,6 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-const (
-	// file permission: owner read only.
-	PERM = 0400
-)
-
 // Request body.
 type Request struct {
 	Options map[string]any `json:"options" validate:"required"`
@@ -99,11 +94,13 @@ func prove(c *fiber.Ctx) error {
 	log.Info("Validation passed")
 
 	// temporary directory
-	tmp, err := os.MkdirTemp(".", "tmp-")
+	tmpPath, err := os.MkdirTemp(".", "tmp-")
 	if err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
+	log.Info("Created tmp directory: ", tmpPath)
+	tmp := filepath.Base(tmpPath)
 	// cleanup
 	defer func() {
 		if err := os.RemoveAll(tmp); err != nil {
@@ -112,10 +109,9 @@ func prove(c *fiber.Ctx) error {
 			log.Info("Cleaned up tmp directory: ", tmp)
 		}
 	}()
-	log.Info("Created tmp directory: ", tmp)
 
 	// write formula to file
-	if err := os.WriteFile(filepath.Join(tmp, "formula.txt"), []byte(req.Formula), PERM); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "formula.txt"), []byte(req.Formula), 0400); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -127,7 +123,7 @@ func prove(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	// write options to file
-	if err := os.WriteFile(filepath.Join(tmp, "options.json"), options, PERM); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "options.json"), options, 0400); err != nil {
 		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -183,9 +179,14 @@ func prove(c *fiber.Ctx) error {
 	}
 	log.Info("Read result.yaml")
 
-	// add stdout and timeout to result
-	response.Result["stdout"] = string(stdout)
-	response.Result["timeout"] = timeout
+	// add stdout if not empty
+	if s := string(stdout); s != "" {
+		response.Result["stdout"] = s
+	}
+	// add timeout if timed out
+	if timeout {
+		response.Result["timeout"] = true
+	}
 
 	// remove result.yaml
 	if err := os.Remove(filepath.Join(tmp, "result.yaml")); err != nil {
@@ -200,7 +201,6 @@ func prove(c *fiber.Ctx) error {
 		// return response without files
 		return c.JSON(response)
 	}
-	log.Info("Found ", len(files), " files in tmp directory")
 
 	// process each file in tmp directory
 	for _, f := range files {
@@ -215,8 +215,10 @@ func prove(c *fiber.Ctx) error {
 			continue
 		}
 
-		// add content to response
-		response.Files[filename] = string(content)
+		// add content to response if not empty
+		if s := string(content); s != "" {
+			response.Files[filename] = s
+		}
 	}
 	log.Info("Added all files")
 

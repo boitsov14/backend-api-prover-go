@@ -15,6 +15,7 @@ linters:
     - exhaustruct # redundant to write all struct fields
     - funlen # don't care about function length
     - godox # want to use TODO comments
+    - mnd # want to use magic numbers
     - nestif # don't care about the complexity of nested if statements
     - nlreturn # don't want to insert a newline before return statement
     - noinlineerr # want to use inline error
@@ -47,6 +48,8 @@ linters:
         - name: function-length
           disabled: true
         - name: cyclomatic
+          disabled: true
+        - name: add-constant
           disabled: true
   exclusions:
     rules:
