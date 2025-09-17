@@ -1,6 +1,5 @@
-FROM gcr.io/distroless/cc:nonroot
+FROM cgr.dev/chainguard/glibc-dynamic
 WORKDIR /app
-USER nonroot:nonroot
 EXPOSE 3000
 COPY prover .
 COPY main .

@@ -41,7 +41,7 @@ add package:
     go get {{ package }}
 
 ###############################################
-# Build and Deploy
+# Build
 ###############################################
 
 # Build binary for Linux
@@ -51,22 +51,21 @@ build:
 # Copy binary from Rust project
 copy-prover:
     -cp "$RUST_PROJECT_PATH/target/release/theorem-prover-rs.exe" "./prover.exe"
-    cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./prover"
+    -cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./prover"
 
 # Build Docker image
 docker:
     docker build -t prover .
 
-# Run Docker container
-container:
-    docker stop prover || true
-    docker rm prover || true
-    docker run --env-file .env -p 3000:3000 --name prover prover
-
 # Stop and remove Docker container
 stop:
     docker stop prover || true
     docker rm prover || true
+
+# Run Docker container
+container:
+    just stop
+    docker run --env-file .env -p 3000:3000 --name prover prover
 
 # Run all steps
 all:
@@ -77,3 +76,7 @@ all:
     just copy-prover
     just docker
     just container
+
+###############################################
+# Deploy
+###############################################
