@@ -1,3 +1,7 @@
+###################################
+# Basic configuration
+###################################
+
 # For windows compatibility
 set windows-shell := ["C:\\Program Files\\Git\\bin\\sh.exe", "-c"]
 
@@ -10,6 +14,10 @@ set dotenv-load := true
 # Format justfile
 just-fmt:
     just --fmt --unstable
+
+###################################
+# Update
+###################################
 
 # Update Go
 # To update golangci-lint, visit https://golangci-lint.run/docs/welcome/install/#binaries
@@ -28,6 +36,10 @@ update:
     go get -t -u ./...
     go mod tidy
 
+###################################
+# Formatter and Linter
+###################################
+
 # Fmt
 fmt:
     golangci-lint fmt
@@ -36,13 +48,33 @@ fmt:
 lint:
     golangci-lint run --fix
 
+###################################
+# Run
+###################################
+
+# Run the project
+run:
+    go run .
+
+###################################
+# Dependencies
+###################################
+
 # Add dependency to go.mod
 add package:
     go get {{ package }}
 
-###############################################
+# Install binary package globally
+# To delete an installed package, visit `C:\Users\xxx\go\bin`, and delete the exe file
+# To check installed packages, visit the same folder
+# To update an installed package, run `go install package@latest` again
+# To update vscode go extension, Ctrl+Shift+P and search for "Go: Install/Update Tools"
+install package:
+    go install {{ package }}
+
+###################################
 # Build
-###############################################
+###################################
 
 # Build binary for Linux
 build:
@@ -52,6 +84,10 @@ build:
 copy-prover:
     -cp "$RUST_PROJECT_PATH/target/release/theorem-prover-rs.exe" "./prover.exe"
     -cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./prover"
+
+###################################
+# Docker
+###################################
 
 # Build Docker image
 docker:
@@ -77,6 +113,6 @@ all:
     just docker
     just container
 
-###############################################
+###################################
 # Deploy
-###############################################
+###################################
