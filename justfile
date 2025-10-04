@@ -82,8 +82,9 @@ build:
 
 # Copy binary from Rust project
 copy:
-    -cp "$RUST_PROJECT_PATH/target/release/theorem-prover-rs.exe" "./bin/prover.exe"
-    -cp "$RUST_PROJECT_PATH/target/trace/theorem-prover-rs.exe" "./bin/prover-trace.exe"
+    rm -rf ./bin/* || true
+    -cp "$RUST_PROJECT_PATH/target/release/theorem-prover-rs.exe" "./bin/prover-windows.exe"
+    -cp "$RUST_PROJECT_PATH/target/trace/theorem-prover-rs.exe" "./bin/prover-trace-windows.exe"
     -cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./bin/prover"
     -cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/trace/theorem-prover-rs" "./bin/prover-trace"
 
@@ -111,7 +112,7 @@ all:
     just lint
     just update
     just build
-    just copy-prover
+    just copy
     just docker
     just container
 
