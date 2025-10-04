@@ -81,7 +81,7 @@ build:
     GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o main
 
 # Copy binary from Rust project
-copy-prover:
+copy:
     -cp "$RUST_PROJECT_PATH/target/release/theorem-prover-rs.exe" "./bin/prover.exe"
     -cp "$RUST_PROJECT_PATH/target/trace/theorem-prover-rs.exe" "./bin/prover-trace.exe"
     -cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./bin/prover"
