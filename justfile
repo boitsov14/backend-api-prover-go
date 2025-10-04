@@ -82,8 +82,10 @@ build:
 
 # Copy binary from Rust project
 copy-prover:
-    -cp "$RUST_PROJECT_PATH/target/release/theorem-prover-rs.exe" "./prover.exe"
-    -cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./prover"
+    -cp "$RUST_PROJECT_PATH/target/release/theorem-prover-rs.exe" "./bin/prover.exe"
+    -cp "$RUST_PROJECT_PATH/target/trace/theorem-prover-rs.exe" "./bin/prover-trace.exe"
+    -cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./bin/prover"
+    -cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/trace/theorem-prover-rs" "./bin/prover-trace"
 
 ###################################
 # Docker

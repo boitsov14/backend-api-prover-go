@@ -1,6 +1,5 @@
 # env file
 .env
 # binary
+/bin/
 main
-prover
-prover.exe
