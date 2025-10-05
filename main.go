@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,8 +14,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/goccy/go-yaml"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/log"
-	"github.com/gofiber/fiber/v2/middleware/basicauth"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
@@ -27,7 +26,8 @@ import (
 type Request struct {
 	Options map[string]any `json:"options" validate:"required"`
 	Formula string         `json:"formula" validate:"required"`
-	Timeout int            `json:"timeout" validate:"required,min=1"`
+	Timeout int            `json:"timeout" validate:"required,min=1,max=10"`
+	Trace   bool           `json:"trace"`
 }
 
 // Response body.
@@ -50,12 +50,9 @@ func main() {
 	app.Use(compress.New())    // compression
 	app.Use(healthcheck.New()) // healthcheck at /livez
 
-	// basic authentication
-	app.Use(basicauth.New(basicauth.Config{
-		Users: map[string]string{
-			"user": os.Getenv("PASSWORD"),
-		},
-	}))
+	// setup json logger
+	l := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
+	slog.SetDefault(l)
 
 	// main API
 	app.Post("/", prove)
@@ -66,90 +63,105 @@ func main() {
 		port = "3000"
 	}
 
+	// use localhost in dev environment
+	host := ""
+	if os.Getenv("ENV") == "dev" {
+		host = "localhost"
+	}
+
 	// start server
-	log.Info("Starting server on port:", port)
-	log.Fatal(app.Listen(":" + port))
+	slog.Info("Starting server on port: " + port)
+	if err := app.Listen(host + ":" + port); err != nil {
+		slog.Error("Failed to listen", "error", err)
+		os.Exit(1)
+	}
 }
 
 func prove(c *fiber.Ctx) error {
-	log.Info("Request received")
+	slog.Info("Request received")
 
 	// initialize request
 	req := new(Request)
 
 	// parse
 	if err := c.BodyParser(req); err != nil {
-		log.Error(err)
+		slog.Error("Failed to parse body", "error", err)
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	// TODO: 2025/09/10 google cloud run上でどう見えるか確認する
-	log.Info(req)
+	slog.Info("Body parsed")
 
 	// validate
 	validate := validator.New()
 	if err := validate.Struct(req); err != nil {
-		log.Error(err)
+		slog.Error("Validation failed", "error", err)
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	log.Info("Validation passed")
+	slog.Info("Validation passed")
+	slog.Info("Request", "request", req)
 
 	// temporary directory
 	tmpPath, err := os.MkdirTemp(".", "tmp-")
 	if err != nil {
-		log.Error(err)
+		slog.Error("Failed to create tmp directory", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	log.Info("Created tmp directory: ", tmpPath)
+	slog.Info("Created tmp directory: " + tmpPath)
 	tmp := filepath.Base(tmpPath)
 	// cleanup
 	defer func() {
-		if err := os.RemoveAll(tmp); err != nil {
-			log.Error(err)
+		if err := os.RemoveAll(tmpPath); err != nil {
+			slog.Error("Failed to cleanup tmp directory", "error", err)
 		} else {
-			log.Info("Cleaned up tmp directory: ", tmp)
+			slog.Info("Cleaned up tmp directory: " + tmpPath)
 		}
 	}()
 
 	// write formula to file
 	if err := os.WriteFile(filepath.Join(tmp, "formula.txt"), []byte(req.Formula), 0400); err != nil {
-		log.Error(err)
+		slog.Error("Failed to write formula.txt", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	// convert options to JSON string
 	options, err := json.MarshalIndent(req.Options, "", "  ")
 	if err != nil {
-		log.Error(err)
+		slog.Error("Failed to marshal options", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	// write options to file
 	if err := os.WriteFile(filepath.Join(tmp, "options.json"), options, 0400); err != nil {
-		log.Error(err)
+		slog.Error("Failed to write options.json", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	log.Info("Wrote input files")
+	slog.Info("Wrote input files")
 
 	// context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.Timeout)*time.Second)
 	defer cancel()
 
-	// execute prover
-	prover := "./prover"
-	if runtime.GOOS == "windows" {
-		prover = "./prover.exe"
+	// setup prover path
+	prover := "prover"
+	if req.Trace {
+		prover += "-trace"
 	}
-	log.Info("Proving..")
+	if runtime.GOOS == "windows" {
+		prover += "-windows.exe"
+	}
+	prover = filepath.Join(".", "bin", prover)
+
+	// execute prover
+	slog.Info("Proving..")
 	cmd := exec.CommandContext(ctx, prover, "--out", tmp) // #nosec G204
 	stdout, err := cmd.CombinedOutput()
 	// check if timed out
 	timeout := errors.Is(ctx.Err(), context.DeadlineExceeded)
 	switch {
 	case timeout:
-		log.Warn("Timeout")
+		slog.Warn("Timeout")
 	case err != nil:
-		log.Error(err)
+		slog.Error("Prover execution error", "error", err)
 	default:
-		log.Info("Done")
+		slog.Info("Done")
 	}
 
 	// remove input files
@@ -159,7 +171,7 @@ func prove(c *fiber.Ctx) error {
 	if err := os.Remove(filepath.Join(tmp, "options.json")); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	log.Info("Removed input files")
+	slog.Info("Removed input files")
 
 	// initialize response
 	response := Response{
@@ -169,15 +181,15 @@ func prove(c *fiber.Ctx) error {
 	// read result.yaml
 	content, err := os.ReadFile(filepath.Join(tmp, "result.yaml")) // #nosec G304
 	if err != nil {
-		log.Error(err)
+		slog.Error("Failed to read result.yaml", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	// parse YAML content
 	if err := yaml.Unmarshal(content, &response.Result); err != nil {
-		log.Error(err)
+		slog.Error("Failed to parse result.yaml", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	log.Info("Read result.yaml")
+	slog.Info("Read result.yaml")
 
 	// add stdout if not empty
 	if s := string(stdout); s != "" {
@@ -192,12 +204,12 @@ func prove(c *fiber.Ctx) error {
 	if err := os.Remove(filepath.Join(tmp, "result.yaml")); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	log.Info("Removed result.yaml")
+	slog.Info("Removed result.yaml")
 
 	// read all files from output directory
 	files, err := os.ReadDir(tmp)
 	if err != nil {
-		log.Error(err)
+		slog.Error("Failed to read output directory", "error", err)
 		// return response without files
 		return c.JSON(response)
 	}
@@ -210,7 +222,7 @@ func prove(c *fiber.Ctx) error {
 		// read file
 		content, err := os.ReadFile(filepath.Join(tmp, filename)) // #nosec G304
 		if err != nil {
-			log.Error(err)
+			slog.Error("Failed to read file", "error", err, "file", filename)
 			// skip and continue
 			continue
 		}
@@ -220,7 +232,7 @@ func prove(c *fiber.Ctx) error {
 			response.Files[filename] = s
 		}
 	}
-	log.Info("Added all files")
+	slog.Info("Added all files")
 
 	// return response
 	return c.JSON(response)
