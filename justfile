@@ -46,6 +46,7 @@ fmt:
 
 # Lint
 lint:
+    just fmt
     golangci-lint run --fix
 
 ###################################
@@ -54,7 +55,7 @@ lint:
 
 # Run the project
 run:
-    go run .
+    ENV=dev go run . | jq 'del(.time, .source)'
 
 ###################################
 # Dependencies
@@ -82,7 +83,7 @@ build:
 
 # Copy binary from Rust project
 copy:
-    rm -rf ./bin/* || true
+    # rm -rf ./bin/*
     -cp "$RUST_PROJECT_PATH/target/release/theorem-prover-rs.exe" "./bin/prover-windows.exe"
     -cp "$RUST_PROJECT_PATH/target/trace/theorem-prover-rs.exe" "./bin/prover-trace-windows.exe"
     -cp "$RUST_PROJECT_PATH/target/x86_64-unknown-linux-gnu/release/theorem-prover-rs" "./bin/prover"
