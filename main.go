@@ -183,15 +183,6 @@ func prove(c *fiber.Ctx) error {
 	// ==  Setup response
 	// ==============================
 
-	// remove input files
-	if err := os.Remove(filepath.Join(tmp, "formula.txt")); err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
-	if err := os.Remove(filepath.Join(tmp, "options.json")); err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
-	slog.Info("Removed input files")
-
 	// initialize response
 	response := Response{
 		Files: make(map[string]string),
@@ -219,12 +210,6 @@ func prove(c *fiber.Ctx) error {
 		response.Result["timeout"] = true
 	}
 
-	// remove result.yaml
-	if err := os.Remove(filepath.Join(tmp, "result.yaml")); err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
-	slog.Info("Removed result.yaml")
-
 	// ==============================
 	// ==  Read output files
 	// ==============================
@@ -242,11 +227,17 @@ func prove(c *fiber.Ctx) error {
 		// get filename
 		filename := f.Name()
 
+		// skip input/result files
+		switch filename {
+		case "formula.txt", "options.json", "result.yaml":
+			continue
+		}
+
 		// read file
 		content, err := os.ReadFile(filepath.Join(tmp, filename)) // #nosec G304
 		if err != nil {
 			slog.Error("Failed to read file", "error", err, "file", filename)
-			// skip and continue
+			// skip
 			continue
 		}
 

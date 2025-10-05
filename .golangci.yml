@@ -51,6 +51,8 @@ linters:
           disabled: true
         - name: add-constant
           disabled: true
+        - name: enforce-switch-style
+          disabled: true
   exclusions:
     rules:
       - path: '_test\.go'
