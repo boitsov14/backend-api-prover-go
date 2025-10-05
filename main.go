@@ -28,7 +28,7 @@ type Request struct {
 	Options map[string]any `json:"options" validate:"required"`
 	Formula string         `json:"formula" validate:"required"`
 	Timeout int            `json:"timeout" validate:"required,min=1,max=10"`
-	Trace   bool           `json:"trace"   validate:"required"`
+	Trace   bool           `json:"trace"`
 }
 
 // Response body.
