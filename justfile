@@ -88,7 +88,7 @@ install package:
 
 # Build binary for Linux
 build:
-    GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o main
+    GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o bin/main
 
 # Copy binary from Rust project
 copy:
