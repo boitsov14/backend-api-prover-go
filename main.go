@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -27,13 +28,13 @@ type Request struct {
 	Options map[string]any `json:"options" validate:"required"`
 	Formula string         `json:"formula" validate:"required"`
 	Timeout int            `json:"timeout" validate:"required,min=1,max=10"`
-	Trace   bool           `json:"trace"`
+	Trace   bool           `json:"trace"   validate:"required"`
 }
 
 // Response body.
 type Response struct {
-	Files  map[string]string `json:"files"`
-	Result map[string]any    `json:"result"`
+	Files  map[string]map[string]string `json:"files"`
+	Result map[string]any               `json:"result"`
 }
 
 func main() {
@@ -57,7 +58,7 @@ func main() {
 	// main API
 	app.Post("/", prove)
 
-	// initialize port
+	// init port
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
@@ -84,7 +85,7 @@ func prove(c *fiber.Ctx) error {
 	// ==  Parse and Validate
 	// ==============================
 
-	// initialize request
+	// init request
 	req := new(Request)
 
 	// parse
@@ -181,7 +182,7 @@ func prove(c *fiber.Ctx) error {
 	// ==  Setup Result
 	// ==============================
 
-	// initialize response
+	// init response
 	response := new(Response)
 
 	// read result.yaml
@@ -209,7 +210,8 @@ func prove(c *fiber.Ctx) error {
 	// ==  Setup Files
 	// ==============================
 
-	response.Files = make(map[string]string)
+	// init files
+	response.Files = make(map[string]map[string]string)
 
 	// read files from tmp directory
 	files, err := os.ReadDir(tmp)
@@ -230,17 +232,29 @@ func prove(c *fiber.Ctx) error {
 		}
 
 		// read file
-		content, err := os.ReadFile(filepath.Join(tmp, filename)) // #nosec G304
+		bytes, err := os.ReadFile(filepath.Join(tmp, filename)) // #nosec G304
 		if err != nil {
 			slog.Error("Failed to read file", "error", err, "file", filename)
 			// skip
 			continue
 		}
 
-		// add content to response if not empty
-		if s := string(content); s != "" {
-			response.Files[filename] = s
+		// skip empty files
+		content := string(bytes)
+		if content == "" {
+			continue
 		}
+
+		// split filename into base and extension
+		base, ext, _ := strings.Cut(filename, ".")
+
+		// check if extension map exists
+		if _, ok := response.Files[ext]; !ok {
+			response.Files[ext] = make(map[string]string)
+		}
+
+		// add to files
+		response.Files[ext][base] = content
 	}
 
 	// return response
