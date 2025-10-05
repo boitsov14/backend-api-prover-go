@@ -15,6 +15,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/goccy/go-yaml"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/log"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
@@ -52,7 +53,7 @@ func main() {
 	app.Use(healthcheck.New()) // healthcheck at /livez
 
 	// setup json logger
-	l := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
+	l := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(l)
 
 	// main API
@@ -71,15 +72,12 @@ func main() {
 	}
 
 	// start server
-	slog.Info("Starting server on port: " + port)
-	if err := app.Listen(host + ":" + port); err != nil {
-		slog.Error("Failed to listen", "error", err)
-		os.Exit(1)
-	}
+	log.Info("Starting server on port: ", port)
+	log.Fatal(app.Listen(host + ":" + port))
 }
 
 func prove(c *fiber.Ctx) error {
-	slog.Info("Request received")
+	log.Info("Request received")
 
 	// ==============================
 	// ==  Parse and Validate
@@ -90,14 +88,14 @@ func prove(c *fiber.Ctx) error {
 
 	// parse
 	if err := c.BodyParser(req); err != nil {
-		slog.Error("Failed to parse body", "error", err)
+		log.Error(err)
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 
 	// validate
 	validate := validator.New()
 	if err := validate.Struct(req); err != nil {
-		slog.Error("Validation failed", "error", err)
+		log.Error(err)
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 	slog.Info("Request parsed", "request", req)
@@ -109,36 +107,36 @@ func prove(c *fiber.Ctx) error {
 	// tmp directory
 	tmpPath, err := os.MkdirTemp(".", "tmp-")
 	if err != nil {
-		slog.Error("Failed to create tmp directory", "error", err)
+		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	tmp := filepath.Base(tmpPath)
-	slog.Info("Created tmp directory: " + tmp)
+	log.Info("Created tmp directory: ", tmp)
 
 	// cleanup
 	defer func() {
 		if err := os.RemoveAll(tmp); err != nil {
-			slog.Error("Failed to cleanup tmp directory", "error", err)
+			log.Error(err)
 		} else {
-			slog.Info("Cleaned up tmp directory: " + tmp)
+			log.Info("Cleaned up tmp directory: ", tmp)
 		}
 	}()
 
 	// write formula to file
 	if err := os.WriteFile(filepath.Join(tmp, "formula.txt"), []byte(req.Formula), 0400); err != nil {
-		slog.Error("Failed to write formula.txt", "error", err)
+		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	// convert options to JSON string
 	options, err := json.MarshalIndent(req.Options, "", "  ")
 	if err != nil {
-		slog.Error("Failed to marshal options", "error", err)
+		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	// write options to file
 	if err := os.WriteFile(filepath.Join(tmp, "options.json"), options, 0400); err != nil {
-		slog.Error("Failed to write options.json", "error", err)
+		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
@@ -161,7 +159,7 @@ func prove(c *fiber.Ctx) error {
 	prover = filepath.Join(".", "bin", prover)
 
 	// execute prover
-	slog.Info("Proving..")
+	log.Info("Proving..")
 	cmd := exec.CommandContext(ctx, prover, "--out", tmp) // #nosec G204
 	stdout, err := cmd.CombinedOutput()
 
@@ -171,11 +169,11 @@ func prove(c *fiber.Ctx) error {
 	// log result
 	switch {
 	case timeout:
-		slog.Warn("Timeout")
+		log.Warn("Timeout")
 	case err != nil:
-		slog.Error("Prover execution error", "error", err)
+		log.Error(err)
 	default:
-		slog.Info("Done")
+		log.Info("Done")
 	}
 
 	// ==============================
@@ -188,12 +186,12 @@ func prove(c *fiber.Ctx) error {
 	// read result.yaml
 	content, err := os.ReadFile(filepath.Join(tmp, "result.yaml")) // #nosec G304
 	if err != nil {
-		slog.Error("Failed to read result.yaml", "error", err)
+		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	// parse YAML
 	if err := yaml.Unmarshal(content, &response.Result); err != nil {
-		slog.Error("Failed to parse result.yaml", "error", err)
+		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
@@ -216,7 +214,7 @@ func prove(c *fiber.Ctx) error {
 	// read files from tmp directory
 	files, err := os.ReadDir(tmp)
 	if err != nil {
-		slog.Error("Failed to read tmp directory", "error", err)
+		log.Error(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
@@ -234,7 +232,7 @@ func prove(c *fiber.Ctx) error {
 		// read file
 		bytes, err := os.ReadFile(filepath.Join(tmp, filename)) // #nosec G304
 		if err != nil {
-			slog.Error("Failed to read file", "error", err, "file", filename)
+			log.Error(err)
 			// skip
 			continue
 		}

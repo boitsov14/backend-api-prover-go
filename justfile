@@ -55,16 +55,7 @@ lint:
 
 # Run the project
 run:
-    #!/bin/bash
-    ENV=dev go run . | while IFS= read -r line; do
-        if echo "$line" | jq -e . >/dev/null 2>&1; then
-            # if JSON, use jq
-            echo "$line" | jq 'del(.time, .source, .level)'
-        else
-            # if not JSON, print as is
-            echo "$line"
-        fi
-    done
+    ENV=dev go run .
 
 ###################################
 # Dependencies
