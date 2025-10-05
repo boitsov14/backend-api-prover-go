@@ -80,6 +80,10 @@ func main() {
 func prove(c *fiber.Ctx) error {
 	slog.Info("Request received")
 
+	// ==============================
+	// ==  Parse and Validate
+	// ==============================
+
 	// initialize request
 	req := new(Request)
 
@@ -99,20 +103,24 @@ func prove(c *fiber.Ctx) error {
 	slog.Info("Validation passed")
 	slog.Info("Request", "request", req)
 
+	// ==============================
+	// ==  Setup files
+	// ==============================
+
 	// temporary directory
 	tmpPath, err := os.MkdirTemp(".", "tmp-")
 	if err != nil {
 		slog.Error("Failed to create tmp directory", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	slog.Info("Created tmp directory: " + tmpPath)
 	tmp := filepath.Base(tmpPath)
+	slog.Info("Created tmp directory: " + tmp)
 	// cleanup
 	defer func() {
-		if err := os.RemoveAll(tmpPath); err != nil {
+		if err := os.RemoveAll(tmp); err != nil {
 			slog.Error("Failed to cleanup tmp directory", "error", err)
 		} else {
-			slog.Info("Cleaned up tmp directory: " + tmpPath)
+			slog.Info("Cleaned up tmp directory: " + tmp)
 		}
 	}()
 
@@ -135,6 +143,10 @@ func prove(c *fiber.Ctx) error {
 	}
 	slog.Info("Wrote input files")
 
+	// ==============================
+	// ==  Execute prover
+	// ==============================
+
 	// context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.Timeout)*time.Second)
 	defer cancel()
@@ -153,8 +165,11 @@ func prove(c *fiber.Ctx) error {
 	slog.Info("Proving..")
 	cmd := exec.CommandContext(ctx, prover, "--out", tmp) // #nosec G204
 	stdout, err := cmd.CombinedOutput()
+
 	// check if timed out
 	timeout := errors.Is(ctx.Err(), context.DeadlineExceeded)
+
+	// log result
 	switch {
 	case timeout:
 		slog.Warn("Timeout")
@@ -163,6 +178,10 @@ func prove(c *fiber.Ctx) error {
 	default:
 		slog.Info("Done")
 	}
+
+	// ==============================
+	// ==  Setup response
+	// ==============================
 
 	// remove input files
 	if err := os.Remove(filepath.Join(tmp, "formula.txt")); err != nil {
@@ -205,6 +224,10 @@ func prove(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	slog.Info("Removed result.yaml")
+
+	// ==============================
+	// ==  Read output files
+	// ==============================
 
 	// read all files from output directory
 	files, err := os.ReadDir(tmp)
