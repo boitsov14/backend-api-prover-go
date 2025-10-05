@@ -180,13 +180,11 @@ func prove(c *fiber.Ctx) error {
 	}
 
 	// ==============================
-	// ==  Setup response
+	// ==  Setup result
 	// ==============================
 
 	// initialize response
-	response := Response{
-		Files: make(map[string]string),
-	}
+	response := new(Response)
 
 	// read result.yaml
 	content, err := os.ReadFile(filepath.Join(tmp, "result.yaml")) // #nosec G304
@@ -211,15 +209,16 @@ func prove(c *fiber.Ctx) error {
 	}
 
 	// ==============================
-	// ==  Read output files
+	// ==  Setup files
 	// ==============================
+
+	response.Files = make(map[string]string)
 
 	// read all files from output directory
 	files, err := os.ReadDir(tmp)
 	if err != nil {
 		slog.Error("Failed to read output directory", "error", err)
-		// return response without files
-		return c.JSON(response)
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	// process each file in tmp directory
