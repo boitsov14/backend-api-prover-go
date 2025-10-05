@@ -92,7 +92,6 @@ func prove(c *fiber.Ctx) error {
 		slog.Error("Failed to parse body", "error", err)
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	slog.Info("Body parsed")
 
 	// validate
 	validate := validator.New()
@@ -100,14 +99,13 @@ func prove(c *fiber.Ctx) error {
 		slog.Error("Validation failed", "error", err)
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	slog.Info("Validation passed")
-	slog.Info("Request", "request", req)
+	slog.Info("Request parsed", "request", req)
 
 	// ==============================
-	// ==  Setup files
+	// ==  Temp directory and files
 	// ==============================
 
-	// temporary directory
+	// tmp directory
 	tmpPath, err := os.MkdirTemp(".", "tmp-")
 	if err != nil {
 		slog.Error("Failed to create tmp directory", "error", err)
@@ -115,6 +113,7 @@ func prove(c *fiber.Ctx) error {
 	}
 	tmp := filepath.Base(tmpPath)
 	slog.Info("Created tmp directory: " + tmp)
+
 	// cleanup
 	defer func() {
 		if err := os.RemoveAll(tmp); err != nil {
@@ -141,7 +140,6 @@ func prove(c *fiber.Ctx) error {
 		slog.Error("Failed to write options.json", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	slog.Info("Wrote input files")
 
 	// ==============================
 	// ==  Execute prover
@@ -180,7 +178,7 @@ func prove(c *fiber.Ctx) error {
 	}
 
 	// ==============================
-	// ==  Setup result
+	// ==  Setup Result
 	// ==============================
 
 	// initialize response
@@ -192,12 +190,11 @@ func prove(c *fiber.Ctx) error {
 		slog.Error("Failed to read result.yaml", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	// parse YAML content
+	// parse YAML
 	if err := yaml.Unmarshal(content, &response.Result); err != nil {
 		slog.Error("Failed to parse result.yaml", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	slog.Info("Read result.yaml")
 
 	// add stdout if not empty
 	if s := string(stdout); s != "" {
@@ -209,15 +206,15 @@ func prove(c *fiber.Ctx) error {
 	}
 
 	// ==============================
-	// ==  Setup files
+	// ==  Setup Files
 	// ==============================
 
 	response.Files = make(map[string]string)
 
-	// read all files from output directory
+	// read files from tmp directory
 	files, err := os.ReadDir(tmp)
 	if err != nil {
-		slog.Error("Failed to read output directory", "error", err)
+		slog.Error("Failed to read tmp directory", "error", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
@@ -245,7 +242,6 @@ func prove(c *fiber.Ctx) error {
 			response.Files[filename] = s
 		}
 	}
-	slog.Info("Added all files")
 
 	// return response
 	return c.JSON(response)
