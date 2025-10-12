@@ -21,7 +21,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	_ "github.com/joho/godotenv/autoload"
 )
 
 // Request body.
@@ -111,14 +110,11 @@ func prove(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	tmp := filepath.Base(tmpPath)
-	log.Info("Created tmp directory: ", tmp)
 
 	// cleanup
 	defer func() {
 		if err := os.RemoveAll(tmp); err != nil {
 			log.Error(err)
-		} else {
-			log.Info("Cleaned up tmp directory: ", tmp)
 		}
 	}()
 

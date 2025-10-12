@@ -25,10 +25,11 @@ just-fmt:
 update-go:
     go version
     winget upgrade GoLang.Go || true
+    go version
 
 # Update Go version in go.mod
 update-mod:
-    go mod edit -go=1.25.1
+    go mod edit -go=1.25.2
 
 # Update dependencies
 update:
@@ -79,7 +80,7 @@ install package:
 
 # Build binary for Linux
 build:
-    GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o bin/main
+    GOOS=linux CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o bin/main ./src
 
 # Copy binary from Rust project
 copy:
@@ -109,7 +110,6 @@ container:
 
 # Run all steps
 all:
-    just fmt
     just lint
     just update
     just build
@@ -118,5 +118,44 @@ all:
     just container
 
 ###################################
-# Deploy
+# Artifact Registry
 ###################################
+
+# Image path
+IMAGE := env_var('REGION') + '-docker.pkg.dev/' + env_var('PROJECT_ID') + '/' + env_var('REPO') + '/' + env_var('PACKAGE')
+
+# Setup tag
+tag:
+    docker tag latex {{ IMAGE }}
+
+# Push image to Artifact Registry
+push:
+    docker push {{ IMAGE }}:latest
+
+# List images in Artifact Registry
+list:
+    gcloud artifacts docker images list {{ IMAGE }}
+
+# Delete image from Artifact Registry
+delete:
+    gcloud artifacts docker images delete {{ IMAGE }} --quiet
+
+###################################
+# Cloud Run
+###################################
+
+# Deploy to Cloud Run
+deploy:
+    gcloud run deploy $PACKAGE \
+    --image {{ IMAGE }}:latest \
+    --project $PROJECT_ID \
+    --region $REGION \
+    --allow-unauthenticated \
+    --no-cpu-boost \
+    --cpu=1 \
+    --memory=256Mi \
+    --timeout=20 \
+    --concurrency=5 \
+    --max-instances=5 \
+    --port=8080 \
+    --set-env-vars=GOMEMLIMIT=200MiB
